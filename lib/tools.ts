@@ -34,6 +34,21 @@ export const declaraciones = [
     },
   },
   {
+    name: "buscar_conocimiento",
+    description: "Consulta documentos oficiales de la empresa: estructura corporativa (Comercializadora Ramírez Galván), marcas (Zerimar, Rocafrut, Ferrimar, Tenderito), sucursales (15 puntos), historia, pagos, facturación o políticas.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        tema: {
+          type: "STRING",
+          enum: ["empresa", "marcas", "sucursales", "politicas_servicios"],
+          description: "Tema a consultar: 'empresa' (RUC, directivos, matriz, historia), 'marcas' (relación entre Zerimar, Rocafrut, Ferrimar), 'sucursales' (los 15 puntos y direcciones), 'politicas_servicios' (pagos, delivery, promociones, facturación).",
+        },
+      },
+      required: ["tema"],
+    },
+  },
+  {
     name: "buscar_faq",
     description: "Busca respuestas a preguntas frecuentes: pagos, factura, domicilio, empleo, devoluciones, contacto.",
     parameters: { type: "OBJECT", properties: { texto: { type: "STRING" } }, required: ["texto"] },
@@ -127,6 +142,18 @@ export async function ejecutar(nombre: string, a: any, ctx: Ctx): Promise<any> {
         nombre: r.nombre, descripcion: r.descripcion, categoria: r.categoria, precio: r.precio, disponible: r.stock > 0,
       }));
       return top.length ? { encontrado: true, productos: top } : { encontrado: false };
+    }
+
+    if (nombre === "buscar_conocimiento") {
+      const tema = String(a?.tema ?? "").toLowerCase().replace(/[^a-z_]/g, "");
+      const { readFileSync, existsSync } = await import("fs");
+      const { join } = await import("path");
+      const archivo = join(process.cwd(), "knowledge", `${tema}.md`);
+      if (existsSync(archivo)) {
+        const contenido = readFileSync(archivo, "utf-8");
+        return { encontrado: true, tema, contenido };
+      }
+      return { encontrado: false, mensaje: "Documento de conocimiento no encontrado" };
     }
 
     if (nombre === "buscar_faq") {
