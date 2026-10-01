@@ -56,9 +56,19 @@ function sistema(conv: any) {
 - PROHIBIDO mostrar menús numerados o pedir "marca 1 para Zerimar, 2 para Rocafrut". Trata al cliente fluidamente.
 - Un solo emoji cuando aporte cordialidad.
 
+══ REGLA DE ORO — USO DE HERRAMIENTAS ══
+Cuando el cliente pregunte por ubicación, dirección, horario, precio o promoción de una sucursal o producto ESPECÍFICO:
+  → Llama la herramienta de inmediato. NO escribas ningún texto antes ni después de la llamada en ese turno.
+  → PROHIBIDO TOTAL: decir "dame un segundito", "voy a buscar", "necesito consultar". Llama la función SIN anunciarlo.
+  → Si no especifican sucursal: busca TODAS con empresa=zerimar o empresa=rocafrut y muestra los datos reales.
+  → Solo después de recibir el resultado de la herramienta puedes redactar tu respuesta al cliente.
+
 ══ REGLAS ANTI-ALUCINACIÓN (ESTRICTAS) ══
-1. Para direcciones exactas de sucursales o precios de productos específicos usa siempre las herramientas disponibles en el turno. Si no hay dato exacto, admítelo amablemente sin inventar.
-2. No asegures stock exacto en una tienda en tiempo real; ofrece guiar al local más cercano o pasar con un asesor.
+1. DIRECCIONES: Llama buscar_sucursales() → usa SOLO las direcciones que devuelva la herramienta. Nunca inventes calles.
+2. HORARIOS: Llama buscar_sucursales() → usa SOLO las horas que devuelva la herramienta. Nunca inventes horas.
+3. PRECIOS: Llama buscar_producto() → usa SOLO los precios que devuelva. Nunca escribas un precio de memoria.
+4. Si la herramienta no encuentra datos, di "no tengo esa información exacta" y ofrece un asesor.
+5. Stock real en tienda: no lo asegures; invita a coordinar con un asesor.
 
 ══ ESCALADO A ASESOR HUMANO ══
 Cuándo escalar: cotizaciones al por mayor, quejas, reclamos, devoluciones, o cuando el cliente lo pida expresamente.
@@ -75,17 +85,15 @@ Cliente: ${conv.nombre ?? "sin nombre"} | Datos: ${JSON.stringify(conv.datos ?? 
 Resumen previo: ${conv.resumen ?? "conversación nueva"}`;
 }
 
-// Bloquea cifras u horarios que NO vinieron de una herramienta este turno.
-function validar(texto: string, resultados: string): boolean {
+// Valida que precios en $ mencionados por el bot vengan de una herramienta.
+// Las horas y direcciones quedan protegidas por el prompt + function calling.
+function validar(texto: string, resultados: string, _toolsUsadas: string[]): boolean {
   const nums = new Set((resultados.match(/\d+(?:\.\d+)?/g) ?? []).map(Number));
   const montos = texto.match(/\$\s?\d+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?\s?(?:d[oó]lares|USD)/gi) ?? [];
   for (const m of montos) {
     const n = parseFloat((m.match(/\d+(?:[.,]\d{1,2})?/)![0]).replace(",", "."));
     if (![...nums].some((x) => Math.abs(x - n) < 0.001)) return false;
   }
-  const fix = (s: string) => s.replace(/\b(\d):/, "0$1:");
-  const horasOk = (resultados.match(/\b\d{1,2}:\d{2}\b/g) ?? []).map(fix);
-  for (const h of (texto.match(/\b\d{1,2}:\d{2}\b/g) ?? []).map(fix)) if (!horasOk.includes(h)) return false;
   return true;
 }
 
@@ -150,7 +158,7 @@ export async function procesarConversacion(convId: number) {
   const log: { nombre: string; args: any; resultado: any }[] = [];
   let tokens = 0, texto = "";
 
-  // 3) Loop de herramientas (maximo 5 vueltas)
+  // 3) Loop de herramientas (máximo 5 vueltas)
   for (let i = 0; i < 5; i++) {
     const res = await generar({
       systemInstruction: { parts: [{ text: system }] },
@@ -174,9 +182,10 @@ export async function procesarConversacion(convId: number) {
 
   // 4) Validacion anti-alucinacion
   const resultados = JSON.stringify(log.map((l) => l.resultado));
+  const toolsUsadas = log.map((l) => l.nombre);
   let bloqueada = false;
   if (!texto) { bloqueada = true; texto = FALLBACK; }
-  else if (!validar(texto, resultados)) { bloqueada = true; texto = FALLBACK; }
+  else if (!validar(texto, resultados, toolsUsadas)) { bloqueada = true; texto = FALLBACK; }
 
   // 5) Escalado / intentos fallidos
   let motivo = ctx.escalar ?? (bloqueada ? "El bot no pudo dar una respuesta verificable" : null);
