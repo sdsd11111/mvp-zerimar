@@ -3,6 +3,7 @@ import { procesarConversacion } from "./bot";
 
 export const inngest = new Inngest({
   id: "zerimar-rocafrut-bot",
+  eventKey: process.env.INNGEST_EVENT_KEY,
   signingKey: process.env.INNGEST_SIGNING_KEY,
   isDev: process.env.NODE_ENV === "development" && process.env.INNGEST_DEV === "1",
 });
