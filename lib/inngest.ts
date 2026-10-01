@@ -1,7 +1,11 @@
 import { Inngest } from "inngest";
 import { procesarConversacion } from "./bot";
 
-export const inngest = new Inngest({ id: "zerimar-rocafrut-bot" });
+export const inngest = new Inngest({
+  id: "zerimar-rocafrut-bot",
+  signingKey: process.env.INNGEST_SIGNING_KEY,
+  isDev: process.env.NODE_ENV === "development" && process.env.INNGEST_DEV === "1",
+});
 
 // Debounce: espera 3 s despues del ULTIMO mensaje. Concurrency: 1 a la vez por conversacion.
 export const procesarChat = inngest.createFunction(
