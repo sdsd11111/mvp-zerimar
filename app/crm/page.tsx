@@ -31,7 +31,9 @@ const estadoDe = (i: Pick<Item, "bot_activo" | "ultimo_rol">): Filtro =>
 
 function hora(iso: string | null) {
   if (!iso) return "";
-  const d = new Date(iso), hoy = new Date();
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const hoy = new Date();
   return d.toDateString() === hoy.toDateString()
     ? d.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit", hour12: false })
     : d.toLocaleDateString("es-EC", { day: "2-digit", month: "short" });
@@ -39,7 +41,9 @@ function hora(iso: string | null) {
 
 function fechaCorta(iso: string | null) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "2-digit" });
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "2-digit" });
 }
 
 const BANDA: Record<Filtro, string> = {
@@ -56,9 +60,15 @@ const INTENCION_COLOR: Record<string, string> = {
   "Pregunta frecuente": "#6b4fa3",
   "Pasó a asesor": "#8a2f5c",
   "Captura de datos": "#2d7d4a",
+  "Dato del cliente guardado": "#2d7d4a",
   "Solicitó asesor": "#8a4308",
   "Conversación general": "#62716a",
   "Respuesta bloqueada": "#b91c1c",
+};
+
+// Traduce la etiqueta interna a una etiqueta amigable para el CRM
+const INTENCION_LABEL: Record<string, string> = {
+  "Captura de datos": "Dato del cliente guardado",
 };
 
 /* ─── Componente Dashboard ───────────────────────────── */
@@ -90,14 +100,6 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
           <div className="metrica-valor">{stats.hoy}</div>
           <div className="metrica-label">Conversaciones hoy</div>
         </div>
-        <div className="metrica-card rojo">
-          <div className="metrica-valor">{stats.esperando}</div>
-          <div className="metrica-label">Esperan asesor ahora</div>
-        </div>
-        <div className="metrica-card teal">
-          <div className="metrica-valor">{stats.con_bot}</div>
-          <div className="metrica-label">Con el bot activo</div>
-        </div>
       </div>
 
       {/* Gráfica de actividad 7 días */}
@@ -121,19 +123,22 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
       {/* Intenciones detectadas */}
       {intenciones.length > 0 && (
         <section className="dash-seccion">
-          <h3 className="dash-seccion-titulo">Intenciones detectadas</h3>
+          <h3 className="dash-seccion-titulo">Qué consultaron los clientes</h3>
           <div className="intent-lista">
-            {intenciones.map((i) => (
-              <div key={i.intencion} className="intent-fila">
-                <span className="intent-tag" style={{ background: INTENCION_COLOR[i.intencion] ?? "#62716a" }}>
-                  {i.intencion}
-                </span>
-                <div className="intent-bar-wrap">
-                  <div className="intent-bar" style={{ width: `${Math.round((i.n / maxN) * 100)}%`, background: INTENCION_COLOR[i.intencion] ?? "#62716a" }} />
+            {intenciones.map((i) => {
+              const label = INTENCION_LABEL[i.intencion] ?? i.intencion;
+              return (
+                <div key={i.intencion} className="intent-fila">
+                  <span className="intent-tag" style={{ background: INTENCION_COLOR[label] ?? INTENCION_COLOR[i.intencion] ?? "#62716a" }}>
+                    {label}
+                  </span>
+                  <div className="intent-bar-wrap">
+                    <div className="intent-bar" style={{ width: `${Math.round((i.n / maxN) * 100)}%`, background: INTENCION_COLOR[label] ?? INTENCION_COLOR[i.intencion] ?? "#62716a" }} />
+                  </div>
+                  <span className="intent-n">{i.n}</span>
                 </div>
-                <span className="intent-n">{i.n}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
@@ -225,7 +230,7 @@ export default function CRM() {
   const [texto, setTexto] = useState("");
   const [modo, setModo] = useState<"asesor" | "cliente">("asesor");
   const [error, setError] = useState("");
-  const [vista, setVista] = useState<Vista>("chat");
+  const [vista, setVista] = useState<Vista>("dashboard");
   const [metricas, setMetricas] = useState<Metricas | null>(null);
   const [leads, setLeads] = useState<Lead[] | null>(null);
   const fin = useRef<HTMLDivElement>(null);
