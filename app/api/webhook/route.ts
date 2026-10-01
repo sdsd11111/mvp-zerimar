@@ -23,6 +23,14 @@ export async function POST(req: Request) {
     const jid: string = key.remoteJid?.endsWith("@lid") && key.remoteJidAlt ? key.remoteJidAlt : key.remoteJid;
     if (!jid || jid.endsWith("@g.us") || jid === "status@broadcast") continue;
 
+    // Filtro temporal para pruebas: si ONLY_PHONE está configurado, solo atiende a ese número
+    const onlyPhone = process.env.ONLY_PHONE?.replace(/\D/g, "");
+    const numeroRemitente = jid.split("@")[0].replace(/\D/g, "");
+    if (onlyPhone && !numeroRemitente.endsWith(onlyPhone.slice(-9))) {
+      console.log(`Mensaje ignorado (modo pruebas activo para ${onlyPhone}, recibido de ${numeroRemitente})`);
+      continue;
+    }
+
     const texto: string | null =
       m.message?.conversation ?? m.message?.extendedTextMessage?.text ?? m.message?.imageMessage?.caption ?? null;
 
