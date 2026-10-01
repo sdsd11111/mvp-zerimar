@@ -135,8 +135,25 @@ export async function procesarConversacion(convId: number) {
   const ids: number[] = pend.map((p) => p.id);
   const t0 = Date.now();
 
+  // 0) Comando temporal de prueba: /reset para reiniciar de 0 el número
+  const textoEntrante = pend.map((p) => p.texto || "").join(" ").trim();
+  if (/^\/reset\b/i.test(textoEntrante)) {
+    // Borrar trazas, eventos, mensajes y la conversación
+    await exec("DELETE FROM bot_eventos WHERE conversacion_id=?", [convId]);
+    await exec("DELETE FROM bot_trazas WHERE conversacion_id=?", [convId]);
+    await exec("DELETE FROM bot_mensajes WHERE conversacion_id=?", [convId]);
+    await exec("DELETE FROM bot_conversaciones WHERE id=?", [convId]);
+    // Borrar el contacto si no tiene más conversaciones
+    if (conv.contacto_id) {
+      await exec("DELETE FROM bot_contactos WHERE id=?", [conv.contacto_id]);
+    }
+    // Enviar confirmación al WhatsApp
+    await enviarTexto(conv.jid, "🔄 *¡Datos reseteados con éxito!* Se eliminó el historial y tus datos para este número. Puedes iniciar una nueva conversación de prueba desde cero. 🙌");
+    return { ok: true, reset: true };
+  }
+
   // 1) Disparadores por CODIGO (no dependen del modelo)
-  if (ESCALAR_RE.test(pend.map((p) => p.texto).join(" "))) {
+  if (ESCALAR_RE.test(textoEntrante)) {
     const a = await escalar(conv, "El cliente pidió un asesor o tiene un reclamo");
     await responder(conv, a.disponible
       ? "Claro, te paso con un asesor ahora mismo. Ya le comparto lo que conversamos para que no repitas nada 🙌"

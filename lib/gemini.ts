@@ -9,7 +9,12 @@ export async function generar(body: Record<string, any>) {
     process.env.GEMINI_API_KEY_BACKUP,
   ].filter(Boolean) as string[];
 
-  const models = [process.env.GEMINI_MODEL || "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"];
+  const models = [
+    process.env.GEMINI_MODEL || "gemini-3.8-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+  ];
   let lastError: any;
 
   // 1) Cascada de keys de Google Gemini
@@ -130,7 +135,7 @@ export async function generar(body: Record<string, any>) {
       model: "google/gemini-2.5-flash",
       messages,
       temperature: body.generationConfig?.temperature ?? 0.2,
-      max_tokens: body.generationConfig?.maxOutputTokens ?? 1024,
+      max_tokens: Math.min(body.generationConfig?.maxOutputTokens ?? 800, 800),
     };
     if (openAITools.length > 0) orBody.tools = openAITools;
 
