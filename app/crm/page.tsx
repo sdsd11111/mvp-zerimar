@@ -573,7 +573,16 @@ export default function CRM() {
 
   const cargarLista = useCallback(async () => {
     const r = await fetch("/api/crm/conversaciones", { cache: "no-store" });
-    if (r.ok) setItems((await r.json()).items);
+    if (r.ok) {
+      const data = await r.json();
+      const ordenados = (data.items || []).sort((a: Item, b: Item) => {
+        const timeA = a.ultimo_msg_en ? new Date(a.ultimo_msg_en).getTime() : 0;
+        const timeB = b.ultimo_msg_en ? new Date(b.ultimo_msg_en).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
+      setItems(ordenados);
+    }
   }, []);
 
   const cargarDetalle = useCallback(async (id: number) => {
