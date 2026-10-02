@@ -60,8 +60,16 @@ function sistema(conv: any) {
 Cuando el cliente pregunte por ubicación, dirección, horario, precio o promoción de una sucursal o producto ESPECÍFICO:
   → Llama la herramienta de inmediato. NO escribas ningún texto antes ni después de la llamada en ese turno.
   → PROHIBIDO TOTAL: decir "dame un segundito", "voy a buscar", "necesito consultar". Llama la función SIN anunciarlo.
-  → Si no especifican sucursal: busca TODAS con empresa=zerimar o empresa=rocafrut y muestra los datos reales.
   → Solo después de recibir el resultado de la herramienta puedes redactar tu respuesta al cliente.
+
+══ MANEJO INTELIGENTE DE SUCURSALES Y MAPAS ══
+1. Si el cliente menciona su BARRIO O SECTOR EXACTO (ej. "Zamora Huayco", "Las Pitas", "El Sagrario", "San Sebastián", "Arupos"):
+   - Identifica y destaca claramente cuál sucursal le queda MÁS CERCANA a su barrio (por ejemplo, desde Zamora Huayco la más cercana al centro/oriente es Rocafrut José María Peña o Zerimar Centro).
+   - Explica por qué le conviene y comparte su dirección, horario y el enlace de mapa (mapa_url) para que pueda abrirlo en Google Maps.
+   - Opcionalmente menciona una segunda opción cercana si aplica.
+2. Si el cliente SOLO dice la ciudad general (ej. "en Loja" o "en Machala") sin especificar barrio:
+   - Muestra el listado de las sucursales disponibles en esa ciudad agrupadas por Zerimar y Rocafrut, con sus direcciones y horarios.
+3. Cada vez que recomiendes una sucursal específica, incluye su enlace a Google Maps (mapa_url) para facilitarle la llegada al cliente.
 
 ══ REGLAS ANTI-ALUCINACIÓN (ESTRICTAS) ══
 1. DIRECCIONES: Llama buscar_sucursales() → usa SOLO las direcciones que devuelva la herramienta. Nunca inventes calles.
@@ -133,7 +141,10 @@ async function responder(conv: any, texto: string, ids: number[]) {
 
   await enviarTexto(conv.jid, textoFinal);
   await exec("INSERT INTO bot_mensajes (conversacion_id, rol, texto) VALUES (?, 'bot', ?)", [conv.id, textoFinal]);
-  if (ids.length) await exec("UPDATE bot_mensajes SET procesado=1 WHERE id IN (?)", [ids]);
+  if (ids.length) {
+    const maxId = Math.max(...ids);
+    await exec("UPDATE bot_mensajes SET procesado=1 WHERE conversacion_id=? AND rol='cliente' AND id <= ?", [conv.id, maxId]);
+  }
   await exec("UPDATE bot_conversaciones SET ultimo_msg_en=NOW(3) WHERE id=?", [conv.id]);
 }
 

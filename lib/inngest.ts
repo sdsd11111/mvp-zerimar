@@ -8,11 +8,11 @@ export const inngest = new Inngest({
   isDev: process.env.NODE_ENV === "development" && process.env.INNGEST_DEV === "1",
 });
 
-// Debounce: espera 10 s de silencio despues del ULTIMO mensaje para encolar todo. Concurrency: 1 a la vez por conversacion.
+// Debounce: espera 5 s de silencio después del ÚLTIMO mensaje para agrupar todos los mensajes consecutivos en una sola respuesta.
 export const procesarChat = inngest.createFunction(
   {
     id: "procesar-chat",
-    debounce: { key: "event.data.conversacionId", period: "10s", timeout: "40s" },
+    debounce: { key: "event.data.conversacionId", period: "5s", timeout: "20s" },
     concurrency: { key: "event.data.conversacionId", limit: 1 },
     retries: 1,
   },

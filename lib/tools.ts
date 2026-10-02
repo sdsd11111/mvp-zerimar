@@ -115,9 +115,16 @@ export async function ejecutar(nombre: string, a: any, ctx: Ctx): Promise<any> {
       if (emp) { w.push("empresa=?"); p.push(emp); }
       if (a?.ciudad) { w.push("ciudad LIKE ?"); p.push(`%${a.ciudad}%`); }
       if (a?.nombre) { w.push("(nombre LIKE ? OR direccion LIKE ?)"); p.push(`%${a.nombre}%`, `%${a.nombre}%`); }
-      const rows = await q(`SELECT empresa, nombre, direccion, ciudad, telefono, horario FROM bot_sucursales WHERE ${w.join(" AND ")} LIMIT 8`, p);
+      const rows = await q<any>(`SELECT empresa, nombre, direccion, ciudad, telefono, horario FROM bot_sucursales WHERE ${w.join(" AND ")} LIMIT 8`, p);
+      const conMapas = rows.map((r: any) => {
+        const queryMaps = encodeURIComponent(`${r.nombre}, ${r.direccion}, ${r.ciudad}`);
+        return {
+          ...r,
+          mapa_url: `https://maps.google.com/?q=${queryMaps}`,
+        };
+      });
       const h = ahora();
-      return rows.length ? { encontrado: true, ahora: `${h.dia} ${h.hora}`, sucursales: rows } : { encontrado: false };
+      return conMapas.length ? { encontrado: true, ahora: `${h.dia} ${h.hora}`, sucursales: conMapas } : { encontrado: false };
     }
 
     if (nombre === "listar_promociones") {
