@@ -33,6 +33,18 @@ export async function POST(req: Request) {
     });
     if (r.duplicado || !r.botActivo) continue;
 
+    const textoLimpio = (texto || "").trim().toLowerCase();
+    if (textoLimpio === "/reset" || textoLimpio.startsWith("/reset ")) {
+      // Reset inmediato en caliente
+      await exec("DELETE FROM bot_eventos WHERE conversacion_id=?", [r.conversacionId]);
+      await exec("DELETE FROM bot_trazas WHERE conversacion_id=?", [r.conversacionId]);
+      await exec("DELETE FROM bot_mensajes WHERE conversacion_id=?", [r.conversacionId]);
+      await exec("DELETE FROM bot_conversaciones WHERE id=?", [r.conversacionId]);
+      await exec("DELETE FROM bot_contactos WHERE telefono=?", [jid]);
+      await enviarTexto(jid, "🔄 *¡Datos reseteados con éxito!* Se eliminó el historial y tus datos para este número. Puedes iniciar una nueva conversación de prueba desde cero. 🙌");
+      continue;
+    }
+
     if (!texto) {
       const aviso = "Por ahora solo puedo leer mensajes de texto 🙂 ¿Me lo escribes? Si prefieres, te paso con un asesor.";
       await enviarTexto(jid, aviso);
