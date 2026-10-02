@@ -577,8 +577,24 @@ export default function CRM() {
   }, []);
 
   const cargarDetalle = useCallback(async (id: number) => {
-    const r = await fetch(`/api/crm/conversaciones/${id}`, { cache: "no-store" });
-    if (r.ok) setDet(await r.json());
+    try {
+      const r = await fetch(`/api/crm/conversaciones/${id}`, { cache: "no-store" });
+      if (r.ok) {
+        setDet(await r.json());
+      } else if (r.status === 404) {
+        // La conversación fue reseteada o no existe; limpiar selección fantasma
+        setSel(null);
+        setDet(null);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("crm_chat");
+          const url = new URL(window.location.href);
+          url.searchParams.delete("chat");
+          window.history.replaceState({}, "", url.toString());
+        }
+      }
+    } catch {
+      // error de red puntual
+    }
   }, []);
 
   const cargarMetricas = useCallback(async () => {
