@@ -53,7 +53,7 @@ function sistema(conv: any) {
 ══ CÓMO HABLAS ══
 - Tono lojano, cercano, empático y muy natural (como una persona real que atiende en tienda con cariño).
 - Tuteas con calidez, respeto y frescura. Cero lenguaje robótico o seco.
-- REGLA DE SALUDO: Saluda ("¡Hola!", "¡Buenos días!") ÚNICAMENTE en el primer mensaje de la conversación. Si la conversación ya está iniciada o ya saludaste antes en el historial, NO vuelvas a saludar con "¡Hola!"; ve directo a contestar lo que el cliente pregunta de manera natural y fluida.
+- REGLA DE SALUDO: Saluda cordialmente en el primer mensaje de contacto o si el cliente vuelve a escribir tras varias horas de inactividad. Pero mientras la conversación esté en curso continuo (mismo hilo / pocos minutos), NUNCA repitas saludos ("¡Hola!", "¡Hola de nuevo!"). Ve directo al grano contestando su consulta.
 - Usa emojis profesionales y agradables para que el mensaje se sienta vivo y humano (por ejemplo: 👋, 😊, 🛒, 🍎, 📍, ⏰, ✨, 🙌). Incluye entre 1 y 3 emojis bien ubicados por respuesta según el contexto (saludo, información, despedida).
 - Mensajes claros y ágiles, bien distribuidos (puedes usar viñetas o saltos de línea amigables si das varias opciones o datos).
 - PROHIBIDO mostrar menús numerados o decir "marca 1 para...". Conversa fluidamente como en un WhatsApp real.
@@ -99,9 +99,36 @@ function validar(texto: string, resultados: string, _toolsUsadas: string[]): boo
   return true;
 }
 
+function limpiarSaludoRepetido(texto: string): string {
+  // Elimina saludos al inicio como "¡Hola de nuevo!", "¡Hola!", "Hola Cristhopher,", "Buenas tardes,", etc.
+  return texto
+    .replace(/^(\s*¡?\s*(hola(?:\s+de\s+nuevo)?|buenos\s+d[ií]as|buenas\s+tardes|buenas\s+noches)(?:\s+[a-záéíóúñ]+)?\s*[!.,:;]*\s*(?:[😊👋🤖✨🛒🍎]\s*)*)+/i, "")
+    .trim();
+}
+
 async function responder(conv: any, texto: string, ids: number[]) {
-  await enviarTexto(conv.jid, texto);
-  await exec("INSERT INTO bot_mensajes (conversacion_id, rol, texto) VALUES (?, 'bot', ?)", [conv.id, texto]);
+  // Verificamos cuándo fue el último mensaje del bot
+  const [ultimoBot] = await q<any>(
+    "SELECT creado_en FROM bot_mensajes WHERE conversacion_id=? AND rol='bot' ORDER BY id DESC LIMIT 1",
+    [conv.id]
+  );
+
+  let textoFinal = texto;
+
+  if (ultimoBot?.creado_en) {
+    const diffHoras = (Date.now() - new Date(ultimoBot.creado_en).getTime()) / (1000 * 60 * 60);
+    // Solo si estamos en una conversación ACTIVA y continua (hace menos de 4 horas) quitamos el saludo repetido.
+    // Si escribe después de 4 horas, al día siguiente o la próxima semana, SÍ es natural que salude.
+    if (diffHoras < 4) {
+      const textoSinSaludo = limpiarSaludoRepetido(texto);
+      if (textoSinSaludo.length > 5) {
+        textoFinal = textoSinSaludo.charAt(0).toUpperCase() + textoSinSaludo.slice(1);
+      }
+    }
+  }
+
+  await enviarTexto(conv.jid, textoFinal);
+  await exec("INSERT INTO bot_mensajes (conversacion_id, rol, texto) VALUES (?, 'bot', ?)", [conv.id, textoFinal]);
   if (ids.length) await exec("UPDATE bot_mensajes SET procesado=1 WHERE id IN (?)", [ids]);
   await exec("UPDATE bot_conversaciones SET ultimo_msg_en=NOW(3) WHERE id=?", [conv.id]);
 }
