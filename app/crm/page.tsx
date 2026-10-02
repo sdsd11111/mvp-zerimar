@@ -557,9 +557,18 @@ export default function CRM() {
   const [texto, setTexto] = useState("");
   const [modo, setModo] = useState<"asesor" | "cliente">("asesor");
   const [error, setError] = useState("");
-  const [vista, setVista] = useState<Vista>("dashboard");
+  const [vista, setVista] = useState<Vista>(() => {
+    if (typeof window !== "undefined") {
+      const v = new URLSearchParams(window.location.search).get("vista");
+      if (v === "chat" || v === "dashboard" || v === "leads") return v;
+      const saved = localStorage.getItem("crm_vista");
+      if (saved === "chat" || saved === "dashboard" || saved === "leads") return saved;
+    }
+    return "dashboard";
+  });
   const [metricas, setMetricas] = useState<Metricas | null>(null);
   const [leads, setLeads] = useState<Lead[] | null>(null);
+  const [busqueda, setBusqueda] = useState("");
   const fin = useRef<HTMLDivElement>(null);
 
   const cargarLista = useCallback(async () => {
@@ -582,9 +591,44 @@ export default function CRM() {
     if (r.ok) setLeads((await r.json()).leads);
   }, []);
 
+  // Persistir vista y selección en URL y localStorage
+  const cambiarVista = (v: Vista) => {
+    setVista(v);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("crm_vista", v);
+      const url = new URL(window.location.href);
+      url.searchParams.set("vista", v);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
+
+  const seleccionarChat = (id: number | null) => {
+    setSel(id);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (id != null) {
+        url.searchParams.set("chat", String(id));
+        localStorage.setItem("crm_chat", String(id));
+      } else {
+        url.searchParams.delete("chat");
+        localStorage.removeItem("crm_chat");
+      }
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
+
+  // Restaurar chat seleccionado al inicio
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("chat");
+      const cId = p ? parseInt(p, 10) : parseInt(localStorage.getItem("crm_chat") || "", 10);
+      if (!isNaN(cId)) setSel(cId);
+    }
+  }, []);
+
   useEffect(() => {
     cargarLista();
-    const t = setInterval(cargarLista, 4000);
+    const t = setInterval(cargarLista, 2500);
     return () => clearInterval(t);
   }, [cargarLista]);
 
@@ -596,7 +640,7 @@ export default function CRM() {
   useEffect(() => {
     if (sel == null) { setDet(null); return; }
     cargarDetalle(sel);
-    const t = setInterval(() => cargarDetalle(sel), 3000);
+    const t = setInterval(() => cargarDetalle(sel), 2000);
     return () => clearInterval(t);
   }, [sel, cargarDetalle]);
 
@@ -630,7 +674,20 @@ export default function CRM() {
   }
 
   const esperan = items.filter((i) => estadoDe(i) === "espera").length;
-  const visibles = items.filter((i) => filtro === "todos" || estadoDe(i) === filtro);
+  const qClean = busqueda.trim().toLowerCase();
+  const visibles = items.filter((i) => {
+    if (filtro !== "todos" && estadoDe(i) !== filtro) return false;
+    if (qClean) {
+      const nom = (i.nombre || "").toLowerCase();
+      const num = (i.telefono || "").toLowerCase();
+      const txt = (i.ultimo_texto || "").toLowerCase();
+      const inten = (i.intencion || "").toLowerCase();
+      if (!nom.includes(qClean) && !num.includes(qClean) && !txt.includes(qClean) && !inten.includes(qClean)) {
+        return false;
+      }
+    }
+    return true;
+  });
   const estado = det ? estadoDe({ bot_activo: det.conv.bot_activo, ultimo_rol: det.mensajes.at(-1)?.rol ?? null }) : "todos";
   const prueba = det ? esPrueba(det.conv.telefono) : false;
   const datos = det?.conv.datos ? (typeof det.conv.datos === "string" ? JSON.parse(det.conv.datos) : det.conv.datos) : {};
@@ -644,16 +701,16 @@ export default function CRM() {
 
           {/* Navegación principal */}
           <div className="nav-vistas" role="navigation">
-            <button className="nav-btn" aria-pressed={vista === "chat"} onClick={() => setVista("chat")}>
+            <button className="nav-btn" aria-pressed={vista === "chat"} onClick={() => cambiarVista("chat")}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               Chats
               {esperan > 0 && <span className="nav-badge">{esperan}</span>}
             </button>
-            <button className="nav-btn" aria-pressed={vista === "dashboard"} onClick={() => setVista("dashboard")}>
+            <button className="nav-btn" aria-pressed={vista === "dashboard"} onClick={() => cambiarVista("dashboard")}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
               Dashboard
             </button>
-            <button className="nav-btn" aria-pressed={vista === "leads"} onClick={() => setVista("leads")}>
+            <button className="nav-btn" aria-pressed={vista === "leads"} onClick={() => cambiarVista("leads")}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               Leads
             </button>
@@ -661,6 +718,20 @@ export default function CRM() {
 
           {vista === "chat" && (
             <>
+              {/* Buscador de conversaciones */}
+              <div className="buscador-chats">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input
+                  type="text"
+                  placeholder="Buscar por cliente, tel, mensaje..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                />
+                {busqueda && (
+                  <button className="limpiar-busqueda" onClick={() => setBusqueda("")} title="Limpiar">✕</button>
+                )}
+              </div>
+
               <p className="resumen-dia">
                 {items.length === 0 ? "Aún no hay conversaciones." : esperan > 0
                   ? <><b>{esperan} {esperan === 1 ? "cliente espera" : "clientes esperan"}</b> a un asesor.</>
@@ -678,9 +749,9 @@ export default function CRM() {
         {/* Lista de conversaciones */}
         {vista === "chat" && (
           <div className="items">
-            {visibles.length === 0 && <p className="vacio-lista">No hay conversaciones en esta vista.</p>}
+            {visibles.length === 0 && <p className="vacio-lista">{busqueda ? "No hay resultados para esta búsqueda." : "No hay conversaciones en esta vista."}</p>}
             {visibles.map((i) => (
-              <button key={i.id} className="item" aria-current={sel === i.id} onClick={() => setSel(i.id)}>
+              <button key={i.id} className="item" aria-current={sel === i.id} onClick={() => seleccionarChat(i.id)}>
                 <span className={`avatar ${i.empresa ?? ""}`}>{iniciales(nombreDe(i))}</span>
                 <span style={{ minWidth: 0 }}>
                   <div className="item-nombre">{nombreDe(i)}</div>
@@ -722,7 +793,7 @@ export default function CRM() {
         {vista === "chat" && det && (
           <>
             <header className="hilo-head">
-              <button className="volver" onClick={() => setSel(null)} aria-label="Volver">←</button>
+              <button className="volver" onClick={() => seleccionarChat(null)} aria-label="Volver">←</button>
               <div>
                 <h2 className="hilo-titulo">
                   {nombreDe(det.conv)}
