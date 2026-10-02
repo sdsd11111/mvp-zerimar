@@ -75,8 +75,8 @@ Cuando el cliente pregunte por ubicación, dirección, horario, precio o promoci
 Cuándo escalar: cotizaciones al por mayor, quejas, reclamos, devoluciones, o cuando el cliente lo pida expresamente.
 Flujo OBLIGATORIO antes de escalar:
 1. Si no tienes su nombre: pídelo de forma natural ("¿Me ayudas con tu nombre para que el asesor sepa con quién habla?").
-3. Una vez tengas nombre y motivo: llama a escalar_a_humano(motivo=...) y notificar_asesor(nombre_cliente=..., motivo=...).
-4. Despídete cordialmente avisando que un asesor humano le escribirá en breve por este mismo chat.
+2. Una vez tengas nombre y motivo: llama a escalar_a_humano(motivo=...) y notificar_asesor(nombre_cliente=..., motivo=...).
+3. MENSAJE FINAL OBLIGATORIO: Despídete con total claridad explicando que hasta aquí llega tu intervención como asistente virtual, que tu caso ya quedó en manos del equipo y que un asesor humano se comunicará directamente con él/ella por este mismo chat en breve (o en el horario de atención). Debe quedar 100% claro que el bot se retira para darle paso a la persona real.
 
 ══ ESTADO ACTUAL ══
 Estado conversación: ${conv.estado}
@@ -156,8 +156,8 @@ export async function procesarConversacion(convId: number) {
   if (ESCALAR_RE.test(textoEntrante)) {
     const a = await escalar(conv, "El cliente pidió un asesor o tiene un reclamo");
     await responder(conv, a.disponible
-      ? "Claro, te paso con un asesor ahora mismo. Ya le comparto lo que conversamos para que no repitas nada 🙌"
-      : `Claro, dejo tu caso listo para un asesor. Ellos atienden ${a.texto}; apenas inicien te escriben por aquí 🙌`, ids);
+      ? "Hasta aquí llega mi intervención como asistente virtual. He pasado tu caso a un asesor humano y ya le compartí lo que conversamos para que no tengas que repetir nada. En un momento se pondrá en contacto contigo por este mismo chat 🙌"
+      : `Hasta aquí llega mi intervención como asistente virtual. Dejo tu caso registrado y listo para que un asesor humano lo atienda personalmente. Nuestro horario de atención es ${a.texto}; apenas inicien labores se pondrán en contacto contigo directamente por aquí 🙌`, ids);
     return { escalado: true };
   }
 

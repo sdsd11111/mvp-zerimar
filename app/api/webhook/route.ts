@@ -31,17 +31,28 @@ export async function POST(req: Request) {
       texto: texto ?? "[Mensaje no textual: audio, imagen u otro]",
       procesado: !texto,
     });
-    if (r.duplicado || !r.botActivo) continue;
-
     const textoLimpio = (texto || "").trim().toLowerCase();
     if (textoLimpio === "/reset" || textoLimpio.startsWith("/reset ")) {
-      // Reset inmediato en caliente
+      // Reset inmediato en caliente (funciona siempre, incluso si ya estaba escalado)
       await exec("DELETE FROM bot_eventos WHERE conversacion_id=?", [r.conversacionId]);
       await exec("DELETE FROM bot_trazas WHERE conversacion_id=?", [r.conversacionId]);
       await exec("DELETE FROM bot_mensajes WHERE conversacion_id=?", [r.conversacionId]);
       await exec("DELETE FROM bot_conversaciones WHERE id=?", [r.conversacionId]);
       await exec("DELETE FROM bot_contactos WHERE telefono=?", [jid]);
       await enviarTexto(jid, "🔄 *¡Datos reseteados con éxito!* Se eliminó el historial y tus datos para este número. Puedes iniciar una nueva conversación de prueba desde cero. 🙌");
+      continue;
+    }
+
+    if (r.duplicado) continue;
+
+    // Si el bot ya no está activo (porque ya pasó a asesor humano)
+    if (!r.botActivo) {
+      if (r.estado === "ESCALADO" || r.estado === "HUMANO") {
+        // Notificar amablemente al cliente para que sepa que su mensaje quedó registrado y que no se quedó en el limbo
+        const avisoAsesor = "¡Hola! Tu mensaje quedó registrado en el historial de tu caso ✍️. Como te comentamos, un asesor humano tomará este chat en breve para atenderte directamente. ¡Muchas gracias por tu paciencia! 🙌";
+        await enviarTexto(jid, avisoAsesor);
+        await exec("INSERT INTO bot_mensajes (conversacion_id, rol, texto) VALUES (?, 'bot', ?)", [r.conversacionId, avisoAsesor]);
+      }
       continue;
     }
 
