@@ -25,18 +25,23 @@ export async function generar(body: Record<string, any>) {
   // 1) Cascada de keys y modelos activos de Google Gemini
   for (const apiKey of [...new Set(geminiKeys)]) {
     for (const model of [...new Set(models)]) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 12_000); // 12s timeout por intento
       try {
         const r = await fetch(`${BASE}/${model}:generateContent?key=${apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          signal: ctrl.signal,
         });
+        clearTimeout(timer);
         if (r.ok) return await r.json();
         const errText = await r.text();
         lastError = new Error(`Gemini ${model} ${r.status}: ${errText}`);
         // Si es 429 (cuota de la key agotada), probamos la siguiente key
         if (r.status === 429) break;
       } catch (err) {
+        clearTimeout(timer);
         lastError = err;
       }
     }
@@ -144,6 +149,8 @@ export async function generar(body: Record<string, any>) {
     };
     if (openAITools.length > 0) orBody.tools = openAITools;
 
+    const orCtrl = new AbortController();
+    const orTimer = setTimeout(() => orCtrl.abort(), 12_000);
     const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -153,7 +160,9 @@ export async function generar(body: Record<string, any>) {
         "X-Title": "Zerimar Bot MVP",
       },
       body: JSON.stringify(orBody),
+      signal: orCtrl.signal,
     });
+    clearTimeout(orTimer);
 
     if (!orRes.ok) {
       const errText = await orRes.text();

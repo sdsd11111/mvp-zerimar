@@ -25,15 +25,13 @@ function etiquetaIntencion(log: { nombre: string }[], escalado: boolean, bloquea
 
 function sistema(conv: any) {
   const h = ahora();
-  return `Eres el asistente virtual unificado de Comercializadora Ramírez Galván Cía. Ltda. en WhatsApp (operando las marcas Zerimar, Rocafrut/Rocka Frut, Ferrimar y Tenderito en Loja, Catamayo y Machala).
+  return `Eres el asistente virtual unificado de Comercializadora Ramírez Galván Cía. Ltda. en WhatsApp (operando las marcas Zerimar y Rocafrut/Rocka Frut en Loja, Catamayo y Machala).
 
 ══ ESTRUCTURA EMPRESARIAL Y MARCAS ══
 • EMPRESA MATRIZ: Comercializadora Ramírez Galván Cía. Ltda. (RUC 1191729486001). Matriz en Ancón–Tena 13-82 y Av. Gran Colombia, Loja. Tel corporativo: (07) 258-8083. Correo: contabilidad@zerimar.com.ec.
 • HISTORIA: Inició en 1995 como abarrotes en Loja. La compañía se constituyó formalmente en 2009. Cuentan con 15 establecimientos activos.
 • ZERIMAR: Cadena de supermercados completos. Alimentos de consumo masivo, carnes (procesamiento y transformación propia de carnes rojas y blancas, embutidos artesanales), panadería/repostería propia, lácteos, bebidas, artículos de hogar, electrodomésticos y juguetería.
 • ROCAFRUT / ROCKA FRUT: Tiendas especializadas en frutas y verduras frescas con reposición diaria y abarrotes seleccionados. Venta tanto al detal como al por mayor para negocios.
-• FERRIMAR: Ferretería, maquinaria y herramientas (taladros, tornillos, insumos eléctricos).
-• TENDERITO: Marca histórica del grupo (el establecimiento anterior de Cuenca actualmente figura cerrado).
 
 ══ PROMOCIONES SEMANALES PUBLICADAS ══
 • Martes Rojo: 5% de descuento en carnes de res y cerdo.
@@ -44,7 +42,7 @@ function sistema(conv: any) {
 
 ══ LO QUE PUEDES RESPONDER DIRECTAMENTE (SIN CONSULTAR BASE DE DATOS) ══
 - ¿Son la misma empresa Zerimar y Rocafrut? → Sí, ambas pertenecen a Comercializadora Ramírez Galván Cía. Ltda. Zerimar es el formato supermercado integral y Rocafrut la especialidad en frutas, verduras frescas y abarrotes.
-- ¿Qué venden? → Zerimar víveres, carnes procesadas, panadería, hogar y electrodomésticos; Rocafrut frutas/verduras frescas con reposición diaria; Ferrimar ferretería.
+- ¿Qué venden? → Zerimar víveres, carnes procesadas, panadería, hogar y electrodomésticos; Rocafrut frutas/verduras frescas con reposición diaria.
 - ¿Hacen delivery a domicilio? → No contamos con servicio de delivery propio automático. Para pedidos por mayor o casos especiales, un asesor humano te puede coordinar la entrega.
 - ¿Formas de pago? → Efectivo, tarjetas de débito y crédito (Visa, Mastercard) en cajas.
 - ¿Factura con datos? → Sí, al momento de pagar proporcionas tu RUC o cédula y emitimos factura electrónica al correo.
@@ -144,17 +142,10 @@ async function historial(convId: number, n: number) {
 }
 
 async function escalar(conv: any, motivo: string) {
-  let resumen = "No se pudo generar el resumen; revisa el historial.";
-  try {
-    const h = await historial(conv.id, 20);
-    const conversacion = h.map((m) => `${m.rol}: ${m.texto}`).join("\n");
-    const r = await generar({
-      contents: [{ role: "user", parts: [{ text:
-        `Resume para un asesor humano, en máximo 5 líneas cortas: quién es el cliente, qué quiere, qué ya se le respondió y qué falta resolver. No inventes.\nCliente: ${conv.nombre ?? "sin nombre"} ${JSON.stringify(conv.datos ?? {})}\nResumen previo: ${conv.resumen ?? "ninguno"}\n\nConversación:\n${conversacion}` }] }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 1500 },
-    });
-    resumen = textoDe(r) || resumen;
-  } catch { /* se queda el texto por defecto */ }
+  // Generamos el resumen a partir del historial en memoria (sin llamada extra a Gemini)
+  // para no superar el límite de 60 s de Vercel Serverless.
+  const h = await historial(conv.id, 20);
+  const resumen = h.map((m: any) => `${m.rol === 'cliente' ? '👤 Cliente' : '🤖 Bot'}: ${m.texto}`).join("\n").slice(0, 2000);
   await exec("UPDATE bot_conversaciones SET bot_activo=0, estado='ESCALADO', motivo_escalamiento=?, resumen_agente=? WHERE id=?", [motivo, resumen, conv.id]);
   await exec("INSERT INTO bot_eventos (conversacion_id, tipo, detalle) VALUES (?, 'escalado', ?)", [conv.id, JSON.stringify({ motivo })]);
   return asesoresDisponibles();
@@ -212,7 +203,7 @@ export async function procesarConversacion(convId: number) {
   let tokens = 0, texto = "";
 
   // 3) Loop de herramientas (máximo 5 vueltas)
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 3; i++) {
     const res = await generar({
       systemInstruction: { parts: [{ text: system }] },
       contents,
