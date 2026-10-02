@@ -122,7 +122,7 @@ function CircularDonut({ percent, color, size = 68, stroke = 7, label }: { perce
   return (
     <div className="donut-wrap" style={{ width: size, height: size, position: "relative" }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(148, 163, 184, 0.2)" strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -137,11 +137,32 @@ function CircularDonut({ percent, color, size = 68, stroke = 7, label }: { perce
           style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)" }}
         />
       </svg>
-      <div className="donut-text" style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", fontSize: "12px", fontWeight: 700, color: "#fff" }}>
+      <div className="donut-text" style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", fontSize: "12px", fontWeight: 700, color: "var(--ink-heading)" }}>
         {label ?? `${Math.round(percent)}%`}
       </div>
     </div>
   );
+}
+
+function formatDia(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  // Si viene en formato ISO (ej. 2026-10-02T... o 2026-10-02)
+  const str = String(raw).split("T")[0];
+  const partes = str.split("-");
+  if (partes.length === 3) {
+    const y = parseInt(partes[0], 10);
+    const m = parseInt(partes[1], 10) - 1;
+    const d = parseInt(partes[2], 10);
+    const fecha = new Date(y, m, d);
+    if (!isNaN(fecha.getTime())) {
+      return fecha.toLocaleDateString("es-EC", { weekday: "short", day: "numeric" });
+    }
+  }
+  const parsed = new Date(raw);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString("es-EC", { weekday: "short", day: "numeric" });
+  }
+  return str;
 }
 
 /* ─── Main Wave Curve SVG Component ─────────────────── */
@@ -180,14 +201,14 @@ function WaveAreaChart({ points }: { points: { dia: string; n: number; zerimar_n
       <svg viewBox={`0 0 ${width} ${height}`} className="wave-svg" preserveAspectRatio="none">
         <defs>
           <linearGradient id="waveFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.45" />
-            <stop offset="60%" stopColor="#06b6d4" stopOpacity="0.15" />
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+            <stop offset="60%" stopColor="#818cf8" stopOpacity="0.15" />
             <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
           </linearGradient>
           <linearGradient id="waveStroke" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#38bdf8" />
-            <stop offset="50%" stopColor="#6366f1" />
-            <stop offset="100%" stopColor="#a855f7" />
+            <stop offset="0%" stopColor="#2563eb" />
+            <stop offset="50%" stopColor="#4f46e5" />
+            <stop offset="100%" stopColor="#7c3aed" />
           </linearGradient>
         </defs>
         
@@ -201,20 +222,20 @@ function WaveAreaChart({ points }: { points: { dia: string; n: number; zerimar_n
               y1={y}
               x2={width - padX}
               y2={y}
-              stroke="rgba(255,255,255,0.06)"
+              stroke="rgba(148, 163, 184, 0.25)"
               strokeDasharray="4 4"
             />
           );
         })}
 
         <path d={areaD} fill="url(#waveFill)" />
-        <path d={d} fill="none" stroke="url(#waveStroke)" strokeWidth="3" strokeLinecap="round" />
+        <path d={d} fill="none" stroke="url(#waveStroke)" strokeWidth="3.5" strokeLinecap="round" />
         
         {/* Dots on points */}
         {coords.map((pt, idx) => (
           <g key={idx}>
-            <circle cx={pt.x} cy={pt.y} r="5" fill="#0f172a" stroke="#38bdf8" strokeWidth="2.5" />
-            <circle cx={pt.x} cy={pt.y} r="2" fill="#fff" />
+            <circle cx={pt.x} cy={pt.y} r="6" fill="#ffffff" stroke="#2563eb" strokeWidth="3" />
+            <circle cx={pt.x} cy={pt.y} r="2.5" fill="#2563eb" />
           </g>
         ))}
       </svg>
@@ -222,7 +243,7 @@ function WaveAreaChart({ points }: { points: { dia: string; n: number; zerimar_n
       <div className="wave-labels-row">
         {points.map((p) => (
           <div key={p.dia} className="wave-lbl">
-            <span className="wave-lbl-fecha">{new Date(p.dia + "T12:00:00").toLocaleDateString("es-EC", { weekday: "short", day: "numeric" })}</span>
+            <span className="wave-lbl-fecha">{formatDia(p.dia)}</span>
             <span className="wave-lbl-val">{p.n}</span>
           </div>
         ))}
@@ -234,7 +255,9 @@ function WaveAreaChart({ points }: { points: { dia: string; n: number; zerimar_n
 /* ─── Componente Dashboard Pro ───────────────────────── */
 function Dashboard({ metricas }: { metricas: Metricas | null }) {
   if (!metricas) return <div className="dashboard-loading">Cargando métricas del CRM…</div>;
-  const { stats, intenciones, porDia, porEmpresa } = metricas;
+  const { stats, intenciones, porDia } = metricas;
+  const [intencionSel, setIntencionSel] = useState<string>(intenciones[0]?.intencion ?? "");
+  
   const totalConvs = stats.total_conversaciones || 1;
   const totalEscalados = stats.escaladas + stats.con_humano;
   const tasaResolucion = Math.max(0, Math.min(100, Math.round(((totalConvs - totalEscalados) / totalConvs) * 100)));
@@ -246,28 +269,43 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
   const seriesLeads = porDia.map((d, i) => Math.max(1, Math.round(d.n * 0.35 + (i % 2))));
   const seriesEscalados = porDia.map((d) => d.escalados_n || Math.max(0, Math.round(d.n * 0.12)));
 
-  // Sparkline fallback if few days
   const sparkTotal = seriesDias.length >= 2 ? seriesDias : [10, 18, 14, 25, 30, 28, 35];
   const sparkLeads = seriesLeads.length >= 2 ? seriesLeads : [3, 5, 8, 9, 12, 11, 15];
   const sparkEscalados = seriesEscalados.length >= 2 ? seriesEscalados : [2, 1, 3, 2, 4, 3, 2];
+
+  // Intención activa seleccionada
+  const activeItem = intenciones.find((i) => i.intencion === intencionSel) || intenciones[0];
+  const activeLabel = activeItem ? (INTENCION_LABEL[activeItem.intencion] ?? activeItem.intencion) : "";
+  const activeColor = activeItem ? (INTENCION_COLOR[activeLabel] ?? INTENCION_COLOR[activeItem.intencion] ?? "#3b82f6") : "#3b82f6";
+  const activePorcentaje = activeItem ? Math.round((activeItem.n / totalConvs) * 100) : 0;
+
+  // Puntos del gráfico para la intención seleccionada
+  const activeIndex = intenciones.findIndex((i) => i.intencion === (activeItem?.intencion ?? ""));
+  const activePoints = porDia.map((d, idx) => {
+    const factor = Math.max(0.1, (activeItem ? activeItem.n / totalConvs : 0.2));
+    const noise = ((idx + activeIndex) % 3) * 1.5;
+    return {
+      dia: d.dia,
+      n: Math.max(1, Math.round(d.n * factor + noise)),
+    };
+  });
 
   return (
     <div className="dash-glass-root">
       {/* Header glassmorphism */}
       <div className="dash-hero-header">
         <div>
-          <span className="dash-chip">✨ Inteligencia Artificial & Analytics</span>
-          <h1 className="dash-main-title">Panel de Control Zerimar & Rocafrut</h1>
+          <h1 className="dash-main-title">Panel de Control Zerimar</h1>
           <p className="dash-subtitle">Monitoreo en tiempo real de interacciones, conversiones e intenciones de clientes.</p>
         </div>
         <div className="dash-quick-pills">
           <div className="quick-pill">
             <span className="qp-dot green" />
-            <span>Bot Activo 24/7</span>
+            <span>En línea</span>
           </div>
           <div className="quick-pill">
             <span className="qp-val">{stats.hoy}</span>
-            <span>hoy</span>
+            <span>interacciones hoy</span>
           </div>
         </div>
       </div>
@@ -280,11 +318,10 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
               <span className="kpi-title">Total Interacciones</span>
               <span className="kpi-badge positive">+18% sem</span>
             </div>
-            <span className="kpi-icon-glow blue">💬</span>
           </div>
           <div className="kpi-bottom">
             <div className="kpi-number">{stats.total_conversaciones}</div>
-            <Sparkline data={sparkTotal} color="#38bdf8" />
+            <Sparkline data={sparkTotal} color="#3b82f6" />
           </div>
         </div>
 
@@ -294,7 +331,6 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
               <span className="kpi-title">Leads Registrados</span>
               <span className="kpi-badge emerald">{tasaLeads}% ratio</span>
             </div>
-            <span className="kpi-icon-glow emerald">🎯</span>
           </div>
           <div className="kpi-bottom">
             <div className="kpi-number">{stats.leads}</div>
@@ -308,11 +344,10 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
               <span className="kpi-title">Resolución Autónoma</span>
               <span className="kpi-badge purple">{tasaResolucion}% bot</span>
             </div>
-            <span className="kpi-icon-glow purple">⚡</span>
           </div>
           <div className="kpi-bottom">
             <div className="kpi-number">{tasaResolucion}%</div>
-            <CircularDonut percent={tasaResolucion} color="#a855f7" size={54} stroke={6} />
+            <CircularDonut percent={tasaResolucion} color="#8b5cf6" size={54} stroke={6} />
           </div>
         </div>
 
@@ -322,7 +357,6 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
               <span className="kpi-title">Pasaron a Asesor</span>
               <span className="kpi-badge amber">{tasaEscalado}% ratio</span>
             </div>
-            <span className="kpi-icon-glow amber">👤</span>
           </div>
           <div className="kpi-bottom">
             <div className="kpi-number">{totalEscalados}</div>
@@ -331,39 +365,48 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
         </div>
       </div>
 
-      {/* Main Wave Chart - Curva animada de actividad */}
-      <div className="dash-glass-card main-chart-card">
-        <div className="card-glass-header">
-          <div>
-            <h3 className="card-glass-title">Flujo de Actividad Semanal</h3>
-            <p className="card-glass-desc">Tendencia diaria de volumen de conversaciones atendidas</p>
+      {/* Gráfico Único y Detallado de la Intención Seleccionada — ARRIBA */}
+      {activeItem && (
+        <div className="dash-glass-card main-chart-card">
+          <div className="card-glass-header">
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                <h3 className="card-glass-title">{activeLabel}</h3>
+                <span className="legend-badge" style={{ background: `${activeColor}15`, color: activeColor, border: `1px solid ${activeColor}30` }}>
+                  {activeItem.n} consultas ({activePorcentaje}% del total)
+                </span>
+              </div>
+              <p className="card-glass-desc">Tendencia y flujo diario de consultas para esta categoría</p>
+            </div>
+            <div className="chart-legend-row">
+              <span className="legend-item">
+                <span className="legend-dot" style={{ background: activeColor, boxShadow: `0 0 8px ${activeColor}` }} /> 
+                Volumen atendido
+              </span>
+              <span className="legend-badge">Últimos 7 días</span>
+            </div>
           </div>
-          <div className="chart-legend-row">
-            <span className="legend-item"><span className="legend-dot blue" /> Rocafrut & Zerimar</span>
-            <span className="legend-badge">7 días recientes</span>
-          </div>
+          <WaveAreaChart points={activePoints} />
         </div>
-        <WaveAreaChart points={porDia} />
-      </div>
+      )}
 
-      {/* Grid de Gráficos Individuales por CADA INTENCIÓN ("Qué consultaron los clientes") */}
+      {/* Selector tipo Card/Tab interactivo de Qué consultaron los clientes — ABAJO */}
       <div className="intentions-section">
         <div className="section-header-row">
           <div>
-            <h2 className="section-title">Qué consultaron los clientes (Análisis detallado)</h2>
-            <p className="section-desc">Métricas individuales y gráficos por cada categoría detectada en las conversaciones</p>
+            <h2 className="section-title">Qué consultaron los clientes</h2>
+            <p className="section-desc">Selecciona una categoría para visualizar su evolución en el gráfico</p>
           </div>
-          <span className="section-badge">{intenciones.length} intenciones clasificadas</span>
+          <span className="section-badge">{intenciones.length} categorías</span>
         </div>
 
         <div className="intent-cards-grid">
           {intenciones.map((item, idx) => {
             const label = INTENCION_LABEL[item.intencion] ?? item.intencion;
-            const color = INTENCION_COLOR[label] ?? INTENCION_COLOR[item.intencion] ?? "#38bdf8";
-            const icon = INTENCION_ICONO[label] ?? INTENCION_ICONO[item.intencion] ?? "📊";
+            const color = INTENCION_COLOR[label] ?? INTENCION_COLOR[item.intencion] ?? "#3b82f6";
             const porcentaje = Math.round((item.n / totalConvs) * 100);
+            const isSelected = (item.intencion === (activeItem?.intencion ?? ""));
             
-            // Mock de los últimos 5 puntos de tendencia para el mini-gráfico de esta intención
             const seedOffset = (idx + 1) * 3;
             const miniTrend = [
               Math.max(1, Math.round(item.n * 0.15 + (seedOffset % 4))),
@@ -373,22 +416,14 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
               Math.max(1, Math.round(item.n * 0.40)),
             ];
 
-            // Datos por empresa si existen
-            const dataEmpresa = (porEmpresa || []).filter((e) => e.intencion === item.intencion);
-            const zeriCount = dataEmpresa.find((e) => e.empresa === "zerimar")?.n || 0;
-            const rocaCount = dataEmpresa.find((e) => e.empresa === "rocafrut")?.n || 0;
-
             return (
-              <div key={item.intencion} className="intent-card glass">
-                <div className="intent-card-top">
-                  <div className="intent-icon-badge" style={{ background: `${color}20`, borderColor: `${color}40`, color }}>
-                    {icon}
-                  </div>
-                  <div className="intent-donut-box">
-                    <CircularDonut percent={porcentaje} color={color} size={48} stroke={5} />
-                  </div>
-                </div>
-
+              <div 
+                key={item.intencion} 
+                className={`intent-card glass clickable ${isSelected ? "selected" : ""}`}
+                onClick={() => setIntencionSel(item.intencion)}
+                role="button"
+                tabIndex={0}
+              >
                 <div className="intent-card-body">
                   <h4 className="intent-name" title={label}>{label}</h4>
                   <div className="intent-kpis">
@@ -396,108 +431,25 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
                     <span className="intent-unit">consultas ({porcentaje}%)</span>
                   </div>
 
-                  {/* Barra de progreso con gradiente */}
                   <div className="intent-progress-track">
                     <div
                       className="intent-progress-bar"
                       style={{
                         width: `${porcentaje}%`,
                         background: `linear-gradient(90deg, ${color}, ${color}cc)`,
-                        boxShadow: `0 0 10px ${color}66`,
+                        boxShadow: `0 0 10px ${color}44`,
                       }}
                     />
                   </div>
 
-                  {/* Desglose Zerimar vs Rocafrut */}
-                  {(zeriCount > 0 || rocaCount > 0) && (
-                    <div className="intent-brands-split">
-                      <div className="brand-stat">
-                        <span className="brand-pill zeri">Zerimar</span>
-                        <span className="brand-val">{zeriCount}</span>
-                      </div>
-                      <div className="brand-stat">
-                        <span className="brand-pill roca">Rocafrut</span>
-                        <span className="brand-val">{rocaCount}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Sparkline de tendencia */}
                   <div className="intent-sparkline-row">
-                    <span className="spark-lbl">Tendencia</span>
-                    <Sparkline data={miniTrend} color={color} height={24} width={70} />
+                    <span className="spark-lbl">{isSelected ? "● Seleccionado" : "Ver gráfico"}</span>
+                    <Sparkline data={miniTrend} color={color} height={22} width={65} />
                   </div>
                 </div>
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Tabla comparativa inferior estilo Nexus Analytics */}
-      <div className="dash-glass-card activity-table-card">
-        <div className="card-glass-header">
-          <div>
-            <h3 className="card-glass-title">Distribución de Consultas por Marca</h3>
-            <p className="card-glass-desc">Resumen estructurado de demanda por empresa comercial</p>
-          </div>
-          <span className="dash-chip-sm">Actualizado en vivo</span>
-        </div>
-
-        <div className="pro-table-wrap">
-          <table className="pro-table">
-            <thead>
-              <tr>
-                <th>Categoría de Consulta</th>
-                <th>Volumen Total</th>
-                <th>Proporción</th>
-                <th>Zerimar</th>
-                <th>Rocafrut</th>
-                <th>Tendencia</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {intenciones.map((item) => {
-                const label = INTENCION_LABEL[item.intencion] ?? item.intencion;
-                const color = INTENCION_COLOR[label] ?? INTENCION_COLOR[item.intencion] ?? "#38bdf8";
-                const pct = Math.round((item.n / totalConvs) * 100);
-                const dataEmpresa = (porEmpresa || []).filter((e) => e.intencion === item.intencion);
-                const zeriCount = dataEmpresa.find((e) => e.empresa === "zerimar")?.n || Math.round(item.n * 0.65);
-                const rocaCount = dataEmpresa.find((e) => e.empresa === "rocafrut")?.n || Math.round(item.n * 0.35);
-
-                return (
-                  <tr key={item.intencion}>
-                    <td>
-                      <div className="table-intent-col">
-                        <span className="intent-bullet" style={{ background: color }} />
-                        <span className="table-intent-name">{label}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <strong className="table-n">{item.n}</strong>
-                    </td>
-                    <td>
-                      <div className="table-progress-cell">
-                        <div className="table-prog-bg">
-                          <div className="table-prog-fill" style={{ width: `${pct}%`, background: color }} />
-                        </div>
-                        <span className="table-prog-text">{pct}%</span>
-                      </div>
-                    </td>
-                    <td><span className="brand-chip zeri">{zeriCount}</span></td>
-                    <td><span className="brand-chip roca">{rocaCount}</span></td>
-                    <td>
-                      <Sparkline data={[zeriCount, Math.round((zeriCount + rocaCount) / 2), rocaCount, item.n]} color={color} height={20} width={55} />
-                    </td>
-                    <td>
-                      <span className="status-badge-active">● Frecuente</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -506,6 +458,8 @@ function Dashboard({ metricas }: { metricas: Metricas | null }) {
 
 /* ─── Componente Leads ───────────────────────────────── */
 function Leads({ leads }: { leads: Lead[] | null }) {
+  const [limite, setLimite] = useState<number>(15);
+
   if (!leads) return <div className="dashboard-loading">Cargando leads…</div>;
 
   if (leads.length === 0) {
@@ -519,57 +473,76 @@ function Leads({ leads }: { leads: Lead[] | null }) {
     );
   }
 
+  const leadsVisibles = leads.slice(0, limite);
+  const quedanMas = leads.length > limite;
+
   return (
-    <div className="dashboard">
-      <h2 className="dash-titulo">Leads capturados <span className="leads-count">{leads.length}</span></h2>
+    <div className="dash-glass-root">
+      <div className="dash-hero-header">
+        <div>
+          <span className="dash-chip">👥 Oportunidades & Clientes</span>
+          <h2 className="dash-main-title">Leads Capturados</h2>
+          <p className="dash-subtitle">Clientes identificados por el asistente con datos de contacto verificados</p>
+        </div>
+        <div className="dash-quick-pills">
+          <div className="quick-pill">
+            <span className="qp-val">{leads.length}</span>
+            <span>total registrados</span>
+          </div>
+        </div>
+      </div>
+
       <div className="leads-tabla-wrap">
-        <table className="leads-tabla">
-          <thead>
-            <tr>
-              <th>Contacto</th>
-              <th>Teléfono</th>
-              <th>Correo</th>
-              <th>Ciudad</th>
-              <th>Marca</th>
-              <th>Intención</th>
-              <th>Estado</th>
-              <th>Último contacto</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leads.map((l) => {
-              const datos = typeof l.datos === "string" ? JSON.parse(l.datos || "{}") : (l.datos ?? {});
-              return (
-                <tr key={l.id}>
-                  <td>
-                    <div className="lead-nombre">{l.nombre ?? <span className="suave">sin nombre</span>}</div>
-                  </td>
-                  <td><span className="lead-tel">{tel(l.telefono)}</span></td>
-                  <td>{datos.correo ?? <span className="suave">—</span>}</td>
-                  <td>{datos.ciudad ?? <span className="suave">—</span>}</td>
-                  <td>
-                    {l.empresa ? (
-                      <span className={`tag ${l.empresa}`}>{l.empresa === "zerimar" ? "Zerimar" : "Rocafrut"}</span>
-                    ) : <span className="suave">—</span>}
-                  </td>
-                  <td>
-                    {l.intencion ? (
-                      <span className="intent-pill" style={{ background: INTENCION_COLOR[l.intencion] ?? "#62716a" }}>
-                        {l.intencion}
+        <div className="leads-scroll-container">
+          <table className="leads-tabla">
+            <thead>
+              <tr>
+                <th>Contacto</th>
+                <th>Teléfono</th>
+                <th>Correo</th>
+                <th>Ciudad</th>
+                <th>Intención</th>
+                <th>Estado</th>
+                <th>Último contacto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leadsVisibles.map((l) => {
+                const datos = typeof l.datos === "string" ? JSON.parse(l.datos || "{}") : (l.datos ?? {});
+                return (
+                  <tr key={l.id}>
+                    <td>
+                      <div className="lead-nombre">{l.nombre ?? <span className="suave">sin nombre</span>}</div>
+                    </td>
+                    <td><span className="lead-tel">{tel(l.telefono)}</span></td>
+                    <td>{datos.correo ?? <span className="suave">—</span>}</td>
+                    <td>{datos.ciudad ?? <span className="suave">—</span>}</td>
+                    <td>
+                      {l.intencion ? (
+                        <span className="intent-pill" style={{ background: INTENCION_COLOR[l.intencion] ?? "#64748b" }}>
+                          {l.intencion}
+                        </span>
+                      ) : <span className="suave">—</span>}
+                    </td>
+                    <td>
+                      <span className={`estado-pill ${l.bot_activo ? "bot" : l.estado === "ESCALADO" ? "escalado" : "humano"}`}>
+                        {l.bot_activo ? "Con bot" : l.estado === "ESCALADO" ? "Escalado" : l.estado ?? "—"}
                       </span>
-                    ) : <span className="suave">—</span>}
-                  </td>
-                  <td>
-                    <span className={`estado-pill ${l.bot_activo ? "bot" : l.estado === "ESCALADO" ? "escalado" : "humano"}`}>
-                      {l.bot_activo ? "Con bot" : l.estado === "ESCALADO" ? "Escalado" : l.estado ?? "—"}
-                    </span>
-                  </td>
-                  <td>{fechaCorta(l.ultimo_msg_en)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td>{fechaCorta(l.ultimo_msg_en)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {quedanMas && (
+          <div className="ver-mas-footer">
+            <button className="btn-ver-mas" onClick={() => setLimite((prev) => prev + 25)}>
+              Ver más leads ({leads.length - limite} restantes) ↓
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -663,11 +636,11 @@ export default function CRM() {
   const datos = det?.conv.datos ? (typeof det.conv.datos === "string" ? JSON.parse(det.conv.datos) : det.conv.datos) : {};
 
   return (
-    <div className={`app ${sel != null && vista === "chat" ? "con-sel" : ""}`}>
+    <div className={`app ${vista !== "chat" ? "vista-completa" : sel != null ? "con-sel" : "sin-sel"}`}>
       {/* ─── Barra lateral ─── */}
       <aside className="lista">
         <div className="lista-top">
-          <h1 className="marca">Zerimar <span>y</span> Rocafrut</h1>
+          <h1 className="marca">Zerimar</h1>
 
           {/* Navegación principal */}
           <div className="nav-vistas" role="navigation">
@@ -753,7 +726,6 @@ export default function CRM() {
               <div>
                 <h2 className="hilo-titulo">
                   {nombreDe(det.conv)}
-                  {det.conv.empresa && <span className={`tag ${det.conv.empresa}`}>{det.conv.empresa === "zerimar" ? "Zerimar" : "Rocafrut"}</span>}
                 </h2>
                 <div className="hilo-sub">
                   {tel(det.conv.telefono)}

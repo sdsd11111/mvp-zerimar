@@ -42,14 +42,14 @@ export async function GET() {
   // Actividad últimos 7 días con desglose
   const porDia = await q<any>(`
     SELECT 
-      DATE(creado_en) AS dia, 
+      DATE_FORMAT(creado_en, '%Y-%m-%d') AS dia, 
       COUNT(*) AS n,
       SUM(CASE WHEN empresa = 'zerimar' THEN 1 ELSE 0 END) AS zerimar_n,
       SUM(CASE WHEN empresa = 'rocafrut' THEN 1 ELSE 0 END) AS rocafrut_n,
       SUM(CASE WHEN bot_activo = 0 THEN 1 ELSE 0 END) AS escalados_n
     FROM bot_conversaciones
     WHERE creado_en >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-    GROUP BY DATE(creado_en)
+    GROUP BY DATE_FORMAT(creado_en, '%Y-%m-%d')
     ORDER BY dia ASC
   `);
 
