@@ -3,23 +3,28 @@ const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 export type Content = { role: "user" | "model"; parts: any[] };
 
 export async function generar(body: Record<string, any>) {
-  // Cascada de llaves de Google Gemini (solo keys válidas del env)
+  // Cascada de llaves de Google Gemini (soporta múltiples keys para alta disponibilidad)
   const geminiKeys = [
     process.env.GEMINI_API_KEY,
     process.env.GEMINI_API_KEY_BACKUP,
+    process.env.GEMINI_API_KEY_3,
+    process.env.GEMINI_API_KEY_4,
+    process.env.GEMINI_API_KEY_5,
+    process.env.GEMINI_API_KEY_6,
   ].filter(Boolean) as string[];
 
   const models = [
-    process.env.GEMINI_MODEL || "gemini-3.8-flash",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
+    process.env.GEMINI_MODEL || "gemini-flash-latest",
+    "gemini-flash-latest",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-lite-latest",
   ];
   let lastError: any;
 
-  // 1) Cascada de keys de Google Gemini
+  // 1) Cascada de keys y modelos activos de Google Gemini
   for (const apiKey of [...new Set(geminiKeys)]) {
-    for (const model of models) {
+    for (const model of [...new Set(models)]) {
       try {
         const r = await fetch(`${BASE}/${model}:generateContent?key=${apiKey}`, {
           method: "POST",
@@ -29,8 +34,8 @@ export async function generar(body: Record<string, any>) {
         if (r.ok) return await r.json();
         const errText = await r.text();
         lastError = new Error(`Gemini ${model} ${r.status}: ${errText}`);
-        // Si status 400 (bad model), intenta el siguiente model; si 429/503 cuota, cambia de key
-        if (r.status === 429 || r.status === 503) break;
+        // Si es 429 (cuota de la key agotada), probamos la siguiente key
+        if (r.status === 429) break;
       } catch (err) {
         lastError = err;
       }
